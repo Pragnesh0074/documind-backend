@@ -61,9 +61,6 @@ async def upload_pdf(file: UploadFile = File(...)):
     global vectorstore, retriever, llm, chat_history
     print(f"Received file: {file.filename}")
 
-    if not os.getenv("GOOGLE_API_KEY"):
-        raise HTTPException(status_code=500, detail="GOOGLE_API_KEY is missing. Please check your .env file.")
-
     if not file.filename.endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are supported")
 
