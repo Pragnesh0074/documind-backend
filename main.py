@@ -42,10 +42,20 @@ UPLOAD_DIR = "uploads"
 CHROMA_DB_DIR = "chroma_db"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+# Pre-initialize models to avoid timeouts during upload
+print("Loading HuggingFace Embeddings...")
+embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+
+print("Initializing Groq LLM...")
+llm = ChatGroq(
+    model="llama-3.3-70b-versatile",
+    groq_api_key=os.getenv("GROQ_API_KEY"),
+    temperature=0.3,
+)
+
 # Global state
 vectorstore = None
 retriever = None
-llm = None
 chat_history: List = []   # stores HumanMessage / AIMessage objects
 
 class ChatRequest(BaseModel):
@@ -58,7 +68,7 @@ async def root():
 
 @app.post("/upload")
 async def upload_pdf(file: UploadFile = File(...)):
-    global vectorstore, retriever, llm, chat_history
+    global vectorstore, retriever, chat_history
     print(f"Received file: {file.filename}")
 
     if not file.filename.endswith(".pdf"):
@@ -77,10 +87,7 @@ async def upload_pdf(file: UploadFile = File(...)):
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
         chunks = text_splitter.split_documents(documents)
 
-        print("3. Creating Local Embeddings (HuggingFace)...")
-        embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-
-        print("4. Storing in ChromaDB...")
+        print("3. Storing in ChromaDB...")
         import chromadb
         client = chromadb.PersistentClient(path=CHROMA_DB_DIR)
 
@@ -97,13 +104,6 @@ async def upload_pdf(file: UploadFile = File(...)):
             collection_name="pdf_knowledge"
         )
         retriever = vectorstore.as_retriever(search_kwargs={"k": 4})
-
-        print("5. Initializing Groq LLM (Llama 3.1)...")
-        llm = ChatGroq(
-            model="llama-3.3-70b-versatile",
-            groq_api_key=os.getenv("GROQ_API_KEY"),
-            temperature=0.3,
-        )
 
         # Reset chat history when a new document is uploaded
         chat_history = []
