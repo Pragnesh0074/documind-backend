@@ -26,7 +26,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-app = FastAPI(title="DocuMind Backend")
+app = FastAPI(title="DocBot Backend")
 
 # Enable CORS for frontend
 app.add_middleware(
@@ -64,7 +64,7 @@ class ChatRequest(BaseModel):
 
 @app.get("/")
 async def root():
-    return {"message": "Welcome to DocuMind API"}
+    return {"message": "Welcome to DocBot API"}
 
 @app.post("/upload")
 async def upload_pdf(file: UploadFile = File(...)):
@@ -129,7 +129,7 @@ async def chat(request: ChatRequest):
         # Build the prompt
         prompt = ChatPromptTemplate.from_messages([
             ("system",
-             "You are DocuMind, a helpful AI assistant that answers questions strictly based on "
+             "You are DocBot, a helpful AI assistant that answers questions strictly based on "
              "the provided document context. If the answer is not in the context, say so clearly.\n\n"
              "Context:\n{context}"),
             MessagesPlaceholder(variable_name="chat_history"),
