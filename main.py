@@ -81,35 +81,72 @@ async def upload_pdf(file: UploadFile = File(...)):
     try:
         print("1. Loading PDF...")
         loader = PyPDFLoader(file_path)
-        documents = loader.load()
-
-        print(f"2. Splitting {len(documents)} pages into chunks...")
-        text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
-        chunks = text_splitter.split_documents(documents)
-
-        print("3. Storing in ChromaDB...")
+        
+        print("2. Initializing ChromaDB...")
         import chromadb
         client = chromadb.PersistentClient(path=CHROMA_DB_DIR)
-
-        # Delete old collection if it exists to avoid schema conflicts
         try:
             client.delete_collection("pdf_knowledge")
         except Exception:
             pass
 
-        vectorstore = Chroma.from_documents(
-            documents=chunks,
-            embedding=embeddings,
-            client=client,
-            collection_name="pdf_knowledge"
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1500, 
+            chunk_overlap=250,
+            separators=["\n\n", "\n", " ", ""]
         )
-        retriever = vectorstore.as_retriever(search_kwargs={"k": 4})
+
+        # Batch processing for large documents (1000+ pages)
+        print("3. Processing documents in batches...")
+        vectorstore = None
+        current_batch = []
+        batch_size = 50 # Process 50 pages at a time
+        
+        for i, page in enumerate(loader.lazy_load()):
+            current_batch.append(page)
+            if len(current_batch) >= batch_size:
+                chunks = text_splitter.split_documents(current_batch)
+                if vectorstore is None:
+                    vectorstore = Chroma.from_documents(
+                        documents=chunks,
+                        embedding=embeddings,
+                        client=client,
+                        collection_name="pdf_knowledge"
+                    )
+                else:
+                    vectorstore.add_documents(chunks)
+                current_batch = []
+                print(f"   Processed {i+1} pages...")
+
+        # Process remaining pages
+        if current_batch:
+            chunks = text_splitter.split_documents(current_batch)
+            if vectorstore is None:
+                vectorstore = Chroma.from_documents(
+                    documents=chunks,
+                    embedding=embeddings,
+                    client=client,
+                    collection_name="pdf_knowledge"
+                )
+            else:
+                vectorstore.add_documents(chunks)
+        
+        print("4. Finalizing retriever...")
+        # Use Maximal Marginal Relevance (MMR) for more diverse retrieval across the whole document
+        retriever = vectorstore.as_retriever(
+            search_type="mmr",
+            search_kwargs={
+                "k": 10,
+                "fetch_k": 50,
+                "lambda_mult": 0.5
+            }
+        )
 
         # Reset chat history when a new document is uploaded
         chat_history = []
 
         print("✅ Processing complete!")
-        return {"message": f"File {file.filename} processed successfully", "chunks": len(chunks)}
+        return {"message": f"File {file.filename} processed successfully"}
 
     except Exception as e:
         import traceback
