@@ -15,7 +15,7 @@ from typing import List
 import shutil
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_huggingface import HuggingFaceInferenceAPIEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -42,11 +42,9 @@ UPLOAD_DIR = "uploads"
 CHROMA_DB_DIR = "chroma_db"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-print("Configuring HuggingFace API Embeddings...")
-embeddings = HuggingFaceInferenceAPIEmbeddings(
-    api_key=os.getenv("HUGGINGFACE_API_KEY"),
-    model_name="sentence-transformers/all-MiniLM-L6-v2"
-)
+# Pre-initialize models to avoid timeouts during upload
+print("Loading HuggingFace Embeddings...")
+embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 
 print("Initializing Groq LLM...")
 llm = ChatGroq(
