@@ -1,5 +1,8 @@
 venv/
 .env
+.env.*
+!.env.example
+!.env.*.example
 __pycache__/
 chroma_db/
 uploads/
